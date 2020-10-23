@@ -1,5 +1,6 @@
 import pandas as pd 
 import numpy as np
+from statistics import mean
 from datetime import date, timedelta
 import matplotlib.pyplot as plt
 import os
@@ -11,10 +12,11 @@ from tqdm import tqdm
 import sys
 import PySimpleGUI as sg
 import os.path
+import csv
 
 stocks = []
-end_date = date.today().isoformat()
-#end_date = "2020-10-5"  
+#end_date = date.today().isoformat()
+end_date = "2020-10-5"  
 start_date = (date.today()-timedelta(days=365)).isoformat()
 #yf.pdr_override()
 pbar = ProgressBar()
@@ -23,6 +25,29 @@ def trenddetector(index, data, order = 1):
     coeffs = np.polyfit(index, list(data), order)
     slope = coeffs[-2]
     return float(slope)
+
+def isTrend(data, stockList):
+    returnList = []
+    for i in range(0, len(stockList)):
+        rollingData = data[stockList[i]]
+        if rollingData.empty:
+            pass
+        #print(rollingData.head())
+        short = rollingData.rolling(5).mean()
+        short = short.tolist()
+        lon = rollingData.rolling(20).mean()
+        lon = lon.tolist()
+
+        index = list(range(0, 3))
+
+        slope = trenddetector(index, short[-3:])
+        
+        if lon[-1] > short[-1] and (short[-1]/lon[-1] > .995) and slope > 0:
+            returnList.append(stockList[i])
+            print("added: ", stockList[i])
+            print(short[-1])
+            print(lon[-1])
+    return returnList
 
 def progress(count, total, status = ''):
     bar_len = 60
@@ -36,59 +61,54 @@ def progress(count, total, status = ''):
 
 def analyze(data, tickers, start, end):
     counter = 0
+    watchList = []
     for i in range(start, end):
         # Download Ticker info
-        trend = data['Close'].iloc[:,counter]
+        trend = data[tickers[i]]
         counter = counter+1
-        sg.OneLineProgressMeter("Progress Bar", (counter+start), 505, 'single', tickers[i])
+        #sg.OneLineProgressMeter("Progress Bar", (counter+start), 505, 'single', tickers[i])
         if trend.empty:
             pass
         else:
-            maxCol = trend.shape[0]
-            minCol = maxCol - 20
-            index = list(range(minCol, maxCol))
             trendList = trend.tolist()
             # Only care about close data for now
-            slope = trenddetector(index, trendList[minCol:])
-            if slope > .6:
-                # Get rolling averages
-                short = trend.rolling(20).mean()
-                short_d = short.last("1D")
-                lon = trend.rolling(50).mean()
-                lon_d = lon.last("1D")
-                slope_20MA = trenddetector(index, short[minCol:])
-                slope_50MA = trenddetector(index, lon[minCol:])
-                if slope_20MA > slope_50MA and lon_d.item() > short_d.item() and trend.last("1d").item() < 600:
-                #Start filtering out tickers
-                    fill = (tickers[i])
-                    stocks.append(fill)
+            if (trendList[-1] < 600):# and ():
+                watchList.append(tickers[i])
+    return isTrend(data, watchList)
+    
         
 def finder():
+    firstList = []
+    secondList = []
     df = pd.read_csv('sp500.csv')
-    tickers = df["Symbol"].tolist()
+    tickers = df['Symbol'].tolist()
     t = time.time()
-    data = yf.download(tickers[:252], period = "1y")#, start = start_date, end = end_date
-    analyze(data, tickers, 0, 252)
-    data = yf.download(tickers[252:505], period = "1y")#, start = start_date, end = end_date
-    analyze(data, tickers, 252, 505)     
+    # data = yf.download(tickers[:252], period = "1y")#, start = start_date, end = end_date
+    # data = data['Close']
+    # firstList = analyze(data, tickers, 0, 252)
+    data = yf.download(tickers, period = "60d")#, start = start_date, end = end_date
+    data = data['Close']
+    secondList = analyze(data, tickers, 0, 505)
+    stocks = firstList + secondList     
     print("Time to execute: ", round((time.time() - t)/60, 2), "minutes\n", "Stocks: ", stocks)
+    return stocks
 
 def graph(stock):
-    data = yf.download(stock, period = "30d", interval = "90m")
-    rollingData = yf.download(stock, period = "60d", interval = "90m")
+    data = yf.download(stock, period = "30d")
+    rollingData = yf.download(stock, period = "60d")
     data = data['Close']
     rollingData = rollingData['Close']
     trend = data.tolist()
-    short = rollingData.rolling(50).mean()
-    short = short[149:]
+    short = rollingData.rolling(5).mean()
+    short = short[29:]
     short = short.tolist()
-    lon = rollingData.rolling(100).mean()
-    lon = lon[149:]
+    lon = rollingData.rolling(20).mean()
+    lon = lon[29:]
     lon = lon.tolist()    
     plt.clf()
-    plt.plot(trend, label = "20 MA")
+    plt.plot(trend)
     plt.plot(short, label = "5 MA")
-    plt.plot(lon)
+    plt.plot(lon, label = "20 MA")
     plt.xlabel("Date")
     plt.ylabel("Price")
     plt.legend()
@@ -138,7 +158,7 @@ while True:
         break
     # Folder name was filled in, make a list of files in the folder
     if event == "-CALCULATE-":
-        finder()
+        stocks = finder()
         window["-STOCK LIST-"].update(stocks)
     elif event == "-STOCK LIST-":  # A file was chosen from the listbox
         try:
@@ -151,5 +171,9 @@ while True:
         except:
             pass
 
-os.remove("stock.png")
+try:
+    os.remove("stock.png")
+except:
+    pass
 window.close()
+

@@ -1,0 +1,11 @@
+numpy
+pandas
+statistics
+datetime
+yfinance
+pandas_datareader
+progressbar 
+tqdm
+PySimpleGUI
+func-timeout
+scipy 

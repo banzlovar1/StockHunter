@@ -1,3 +1,4 @@
+from numpy.core.numeric import roll
 import pandas as pd 
 import numpy as np
 from statistics import mean
@@ -16,11 +17,11 @@ import csv
 import func_timeout as fun
 import pandas_market_calendars as pm
 from scipy.stats import linregress
-from multiprocessing import Pool
-import multiprocessing as mp
+import os
 
-CMAstocks = []
-BTstocks = []
+os.chdir("B:\\StockHunter\\V1\\")
+
+stocks = []
 end_date = date.today().isoformat()
 nyse = pm.get_calendar('NYSE')
 start='2020-8-3'
@@ -28,19 +29,6 @@ r = nyse.valid_days(start_date=start, end_date=end_date)
 r = r[:60]
 end = r[len(r)-1]
 pbar = ProgressBar()
-
-def rsi(data, time_window=14):
-    diff = data.diff(1).dropna()
-    up_chg = 0*diff
-    down_chg = 0*diff
-    up_chg[diff > 0] = diff[ diff>0 ]
-    down_chg[diff < 0] = diff[ diff < 0 ]
-    up_chg_avg   = up_chg.ewm(com=time_window-1 , min_periods=time_window).mean()
-    down_chg_avg = down_chg.ewm(com=time_window-1 , min_periods=time_window).mean()
-    
-    rs = abs(up_chg_avg/down_chg_avg)
-    rsi = 100 - 100/(1+rs)
-    return rsi
 
 
 # Finds slopes given a list of data
@@ -81,8 +69,14 @@ def isTrend(data, stockList, choice):
         short = rollingData.rolling(5).mean()
         short = short.tolist()
         lon = rollingData.rolling(20).mean()
+        std = rollingData.rolling(20).std()
+        upper_bollinger = lon + std * 2
+        lower_bollinger = lon - std * 2
         lon = lon.tolist()
+        lower_bollinger = lower_bollinger.tolist()
+        upper_bollinger = upper_bollinger.tolist()
         ds = rollingData.tolist()
+        
 
         index = list(range(0, 3))
 
@@ -92,9 +86,16 @@ def isTrend(data, stockList, choice):
         if choice == 1:
             if crossOver(lon, short, rollingData) and shortslope > 0.3 and dataslope > 0:
                 returnList.append(stockList[i])
-        else:
+        elif choice == 2:
             if  breakThrough(rollingData, short) and dataslope > 0 and shortslope > 0:
                 returnList.append(stockList[i])
+        else:
+            if ds[-1] < lon[-1] and ds[-1] > lower_bollinger[-1] and short[-1] > lower_bollinger[-1]:
+                short_ma_close = float((short[-1] - lower_bollinger[-1]) / short[-1]) * 100.0
+                gap = float((ds[-1] - lower_bollinger[-1]) / ds[-1]) * 100.0
+                if gap < 1.2 and short_ma_close > 2:
+                    returnList.append(stockList[i])
+
     return returnList
 
 # Filters stocks if no data or above price threshold
@@ -133,8 +134,15 @@ def graph(stock, data, vol):
         da = data[29:(len(data)-1)]
         short = rollingData.rolling(5).mean()
         short = short[29:(len(short)-1)]
-        lon = rollingData.rolling(15).mean()
+        lon = rollingData.rolling(20).mean()
         lon = lon[29:(len(lon)-1)]
+
+        std = rollingData.rolling(20).std()
+        upper_bollinger = lon + std * 2
+        upper_bollinger = upper_bollinger[29:(len(upper_bollinger)-1)]
+        lower_bollinger = lon - std * 2
+        lower_bollinger = lower_bollinger[29:(len(lower_bollinger)-1)]
+
         fig = plt.figure(figsize=(6,4))
         fig.clf()
         fig.add_subplot(2,1,1)
@@ -146,31 +154,26 @@ def graph(stock, data, vol):
         plt.plot(short, label = "5 MA")
         s = short.tolist()
         plt.annotate(round(s[-1],2), xy =(60, short[-1:]))
-        # Plot 20 day SMA
+        # # Plot 20 day SMA
         plt.plot(lon, label = "20 MA")
-        l = lon.tolist()
-        plt.annotate(round(l[-1],2), xy =(60, lon[-1:]))
+        # l = lon.tolist()
+        # plt.annotate(round(l[-1],2), xy =(60, lon[-1:]))
+
+        plt.plot(lower_bollinger, label='lower bollinger')
+        plt.plot(upper_bollinger, label='upper bollinger')
+
         plt.xlabel("Date")
         plt.ylabel("Price")
         plt.legend()
         title = "30 Day Stock Info: " +stock
         plt.title(title)
         plt.xticks(rotation=60)
-        plt.grid('on')
         # Volume Plot
-        fig.add_subplot(2,1,2)
+        # fig.add_subplot(2,1,2)
         # vol=vol[29:len(vol)-1]
         # plt.bar(vol.index, vol, color='Green')
         # plt.xticks(rotation=60)
-        rsidf = rsi(data)
-        plt.plot(rsidf[29:])
-        plt.title("14 Day RSI")
-        plt.xlabel("Date")
-        plt.ylabel("RSI")
-        plt.grid('on')
-        plt.tight_layout()
         plt.savefig("stock.png")
-        return rsidf.iloc[-1]
 
 def positions(pos):
     g = []
@@ -195,12 +198,8 @@ def positions(pos):
 
 def addPosition(data, ps, stock, price, quan):
     print("ADD")
-    if price == "":
-        cost = data[60]
-    else:
-        cost = float(price)
-    gain = (data[60]* quan) - (cost*quan)
-    newrow = {'Date':date.today().isoformat(), 'Stock':stock, 'Entry':round(cost,2),
+    gain = (data[60]* quan) - (price*quan)
+    newrow = {'Date':date.today().isoformat(), 'Stock':stock, 'Entry':price,
                 'Current':round(data[60],2), 'Quan':quan, 'Gain':round(gain, 2)}
     ps = ps.append(newrow, ignore_index=True)
     # print(ps)
@@ -217,11 +216,12 @@ def updatePos(data, ps):
 
 
 ######### Pre-Processing ##########################
-#df = pd.read_csv('sp500.csv')
-df = pd.read_csv('sp500.csv')
+df = pd.read_csv('B:\StockHunter\V1\sp500.csv')
 tickers = df['Symbol'].tolist()
-fileName = date.today().isoformat() + '.csv'
+fileName = 'B:\StockHunter\V1\\'+ date.today().isoformat() + '.csv'
 volFileName = date.today().isoformat() + 'Volume'+'.csv'
+# fileName = "B:\\StockHunter\\V1\\2020-12-03.csv"
+# volFileName = "B:\\StockHunter\\V1\\2020-12-03Volume.csv"
 if path.exists(fileName) and path.exists(volFileName):
     data = pd.read_csv(fileName)
     volume = pd.read_csv(volFileName)
@@ -285,26 +285,8 @@ tab2 = [[sg.Text("Enter Stock, Purchase Price, and Quantity")],
     ]
 
 ########### Tab 2 ###################################
-########### Tab 3 ###################################
-tab3Left = [[sg.Text("Ticker: ", key="-Ti-", size=(9,1)), sg.Text("",key="-TICKER-", size=(6,1)), 
-                sg.Text("Price: ", key="-Pi-", size=(9,1)), sg.Text("",key="-PRICE-", size=(6,1))],
-            [sg.Text("52-wk High: ", key="-H-", size=(9,1)), sg.Text("",key="-52H-", size=(6,1)),
-                sg.Text("52-wk Low: ", key="-L-", size=(9,1)), sg.Text("",key="-52L-", size=(6,1))],
-            [sg.Text("RSI: ", key="-rsi-", size=(9,1)), sg.Text("",key="-RSI-", size=(6,1)), 
-            sg.Text("EPS: ", key="-eps-", size=(9,1)), sg.Text("",key="-EPS-", size=(6,1))]]
 
-tab3Right = [[sg.Image(key="-IMAGET3-")],]
-
-tab3Top= [[sg.Text("Search Stock Information"), 
-        sg.InputText(key="-Se-", size=(12,1), do_not_clear=False), sg.Button("Search", key="-SEARCH-")],
-        [sg.HorizontalSeparator()],
-        [sg.Column(tab3Left, expand_y=True), sg.VSeparator(), sg.Column(tab3Right)]
-        ]
-
-########### Tab 3 ###################################
-
-
-layout = [[sg.TabGroup([[sg.Tab('Stocki', t1layout), sg.Tab('Portfolio', tab2), sg.Tab('Search', tab3Top)]])]]
+layout = [[sg.TabGroup([[sg.Tab('Stocki', t1layout), sg.Tab('Portfolio', tab2)]])]]
 
 window = sg.Window("Stocki", layout)
 
@@ -318,42 +300,28 @@ while True:
         if values["-BREAKTHROUGH-"] == True and values["-CMA-"] == True:
             pass
         elif values["-CMA-"] == True:
-            if not CMAstocks:
-                window["-IMAGE-"].update()
-                CMAstocks = finder(data, 1)
-            window["-STOCK LIST-"].update(CMAstocks)
+            window["-IMAGE-"].update()
+            stocks = finder(data, 3)
+            window["-STOCK LIST-"].update(stocks)
             print("CMA")
         elif values["-BREAKTHROUGH-"] == True:
-            if not BTstocks:
-                window["-IMAGE-"].update()
-                BTstocks = finder(data, 2)
-            window["-STOCK LIST-"].update(BTstocks)
+            window["-IMAGE-"].update()
+            stocks = finder(data, 2)
+            window["-STOCK LIST-"].update(stocks)
             print("BT")
     elif event == "-STOCK LIST-":  # A file was chosen from the listbox
         try:
             stock = values["-STOCK LIST-"][0]
-            d = graph(stock, data[stock], volume[stock])  
+            graph(stock, data[stock], volume[stock])  
             window["-IMAGE-"].update(filename="stock.png")
         except:
             pass
     elif event == "-ADD-":
         try:
-            ps = addPosition(data[values["-S-"]], ps, values["-S-"], values["-P-"], int(values["-Q-"]))
+            ps = addPosition(data[values["-S-"]], ps, values["-S-"], float(values["-P-"]), int(values["-Q-"]))
             pos = positions(ps)
             ps.to_csv('position.csv')
             window["-POSITIONS-"].update(pos)
-        except:
-            pass
-    elif event == "-SEARCH-":
-        try:
-            s = yf.Ticker(values["-Se-"]).info
-            window["-TICKER-"].update(values["-Se-"])
-            window["-PRICE-"].update(round(s['regularMarketPrice'], 2))
-            window["-52H-"].update(round(s['fiftyTwoWeekHigh'],2))
-            window["-52L-"].update(round(s['fiftyTwoWeekLow'], 2))
-            r=graph(values["-Se-"], data[values["-Se-"]], volume[values["-Se-"]])
-            window["-RSI-"].update(round(r,2))
-            window["-IMAGET3-"].update(filename="stock.png")
         except:
             pass
 

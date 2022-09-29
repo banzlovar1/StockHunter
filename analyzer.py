@@ -15,19 +15,14 @@ import PySimpleGUI as sg
 import os.path
 import csv
 import func_timeout as fun
-import pandas_market_calendars as pm
 from scipy.stats import linregress
 import os
 
-os.chdir("B:\\StockHunter\\V1\\")
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 stocks = []
 end_date = date.today().isoformat()
-nyse = pm.get_calendar('NYSE')
 start='2020-8-3'
-r = nyse.valid_days(start_date=start, end_date=end_date)
-r = r[:60]
-end = r[len(r)-1]
 pbar = ProgressBar()
 
 
@@ -216,9 +211,9 @@ def updatePos(data, ps):
 
 
 ######### Pre-Processing ##########################
-df = pd.read_csv('B:\StockHunter\V1\sp500.csv')
+df = pd.read_csv('sp500.csv')
 tickers = df['Symbol'].tolist()
-fileName = 'B:\StockHunter\V1\\'+ date.today().isoformat() + '.csv'
+fileName = date.today().isoformat() + 'stock_price.csv'
 volFileName = date.today().isoformat() + 'Volume'+'.csv'
 # fileName = "B:\\StockHunter\\V1\\2020-12-03.csv"
 # volFileName = "B:\\StockHunter\\V1\\2020-12-03Volume.csv"

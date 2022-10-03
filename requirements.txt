@@ -9,3 +9,4 @@ tqdm
 PySimpleGUI
 func-timeout
 scipy 
+matplotlib

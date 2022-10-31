@@ -45,49 +45,6 @@ def breakThrough(data, rolling5):
 def find_rsi(df, periods = 14, ema = True):
     return pta.rsi(df, length=14)
 
-def isTrend(data, stockList, choice):
-    returnList = []
-    for i in range(0, len(stockList)):
-        sg.OneLineProgressMeter("Progress Bar", i, (len(stockList)-1), 'single', stockList[i])
-        rollingData = data[stockList[i]]
-        if rollingData.empty:
-            pass
-        #print(rollingData.head())
-        short = rollingData.rolling(5).mean()
-        short = short.tolist()
-        lon = rollingData.rolling(20).mean()
-        std = rollingData.rolling(20).std()
-        upper_bollinger = lon + std * 2
-        lower_bollinger = lon - std * 2
-        lon = lon.tolist()
-        lower_bollinger = lower_bollinger.tolist()
-        upper_bollinger = upper_bollinger.tolist()
-        ds = rollingData.tolist()
-        
-
-        index = list(range(0, 3))
-
-        shortslope = trenddetector(index, short[-3:])
-        dataslope = trenddetector(index, ds[-3:])
-
-        # if ds[-1] > short[-1]:
-        #     returnList.append(stockList[i])
-
-        if choice == 1:
-            if crossOver(lon, short, rollingData) and shortslope > 0.3 and dataslope > 0:
-                returnList.append(stockList[i])
-        elif choice == 2:
-            if  breakThrough(rollingData, short) and dataslope > 0 and shortslope > 0:
-                returnList.append(stockList[i])
-        else:
-            if ds[-1] < lon[-1] and ds[-1] > lower_bollinger[-1] and short[-1] > lower_bollinger[-1]:
-                short_ma_close = float((short[-1] - lower_bollinger[-1]) / short[-1]) * 100.0
-                gap = float((ds[-1] - lower_bollinger[-1]) / ds[-1]) * 100.0
-                if gap < 1.2 and short_ma_close > 2:
-                    returnList.append((stockList[i], ds[-1], lower_bollinger[-1], upper_bollinger[-1]))
-
-    return returnList
-
 def bollinger_bands(data, stockList):
     picks = []
     for i in range(0, len(stockList)):
@@ -109,7 +66,14 @@ def bollinger_bands(data, stockList):
 
         dataslope = trenddetector(list(range(0, 3)), ds[-3:])
 
+        # Buy signals
+        # 1) Price is above lower band
+        # 2) Stock price has been rising for last 3 days
+        # 3) Price is lower than 20 MA
+        # 4) 5MA just crossed over the 20MA
         if ds[-1] > lower_bollinger[-1] and dataslope > 0 and ds[-1] < lon[-1]:
+            picks.append((stockList[i],ds[-1],lower_bollinger[-1], rsi))
+        elif short[-1] > lon[-1] and short[-2] < lon[-2]:
             picks.append((stockList[i],ds[-1],lower_bollinger[-1], rsi))
 
     # Sort from low to high RSI as lower RSI means oversold  
@@ -170,10 +134,14 @@ def stocks_to_sell(account, data):
             ds = rollingData.tolist()
             MASlope20 = trenddetector(list(range(0, 3)), lon[-3:])
 
+            # Sell triggers
+            # 1) Value of position has dropped to 5% below start
+            # 2) 20MA crosses above 5MA
+            # 3) 20MA slope drops to lower then .25 (momentum declining)
             if account.positions[pos]['value'] < account.positions[pos]['start_price']:
-                if float((account.positions[pos]['start_price'] - account.positions[pos]['value'])/account.positions[pos]['start_price']) > .05:
+                if float((account.positions[pos]['start_price'] - account.positions[pos]['value'])/account.positions[pos]['start_price']) > .03:
                     sell.append(pos)
-            elif lon[-1] < short[-1]:
+            elif lon[-1] > short[-1]:
                 sell.append(pos)
             elif MASlope20 < 0.25:
                 sell.append(pos)
@@ -224,6 +192,8 @@ def test_wrapper(stock_data, tickers, account):
             account.get_account_summary()
         if i % 30 == 0:
             account.add_free_cap(100)
+            account.save_account()
+            input()
     account.get_account_summary()
 
 
@@ -234,8 +204,8 @@ df = pd.read_csv('sp500.csv')
 tickers = df['Symbol'].tolist()
 fileName = date.today().isoformat() + 'stock_price.csv'
 volFileName = date.today().isoformat() + 'Volume'+'.csv'
-# fileName = "2022-09-30stock_price.csv"
-# volFileName = "2022-09-30Volume.csv"
+fileName = "2022-10-03stock_price.csv"
+volFileName = "2022-10-03Volume.csv"
 if path.exists(fileName) and path.exists(volFileName):
     data = pd.read_csv(fileName)
     volume = pd.read_csv(volFileName)

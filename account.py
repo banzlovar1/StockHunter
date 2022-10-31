@@ -1,4 +1,4 @@
-
+import csv
 
 
 class Account():
@@ -72,3 +72,19 @@ class Account():
         self.positions[ticker]['cur_price'] = cur_price
         self.positions[ticker]['value'] = round(self.positions[ticker]['cur_price'] * self.positions[ticker]['shares'], 2)
         self.update_account_value()
+
+    def save_account(self):
+        file_name = self.email.split('@')[0] + '_account_position.csv'
+        with open(file_name, 'w') as file:
+            for pos in self.positions:
+                data = [pos ,self.positions[pos]['start_price'],self.positions[pos]['cur_price'],self.positions[pos]['shares'],self.positions[pos]['value']]
+                writer = csv.writer(file)
+                writer.writerow(data)
+            file.close()
+        file_name = self.email.split('@')[0] + '_account_summary.csv'
+        with open(file_name, 'w') as file:
+            data = [self.name, self.email, self.value, self.total_invested, self.change]
+            writer = csv.writer(file)
+            writer.writerow(data)
+            file.close()
+

@@ -12,6 +12,7 @@ from scipy.stats import linregress
 import PySimpleGUI as sg
 import random
 import pandas_ta as pta
+from csv import DictWriter
 
 def download(stock, period):
     data = yf.download(stock, period = period)
@@ -108,7 +109,7 @@ def simple_buy(data, stockList):
     return picks
 
 def stocks_to_buy(account, picks):
-    if account.free_capital > 10:
+    if account.free_capital > 10: 
         buying = picks[:int(.05*len(picks))]
         for s in buying:
             new_pos = Position(s[0], s[1], (account.free_capital * .1))
@@ -116,6 +117,7 @@ def stocks_to_buy(account, picks):
 
 def stocks_to_sell(account, data):
     if account.positions:
+        date = data["Date"].tolist()[0]
         sell = []
         for pos in account.positions:
             rollingData = data[pos]
@@ -146,8 +148,15 @@ def stocks_to_sell(account, data):
             elif MASlope20 < 0.25:
                 sell.append(pos)
         
+        field_names = ['Date','Ticker', 'Start_Value', 'Sale_Value', 'Account_Value', 'Total_Invested']
         for ticker in sell:
+            row = {'Date':date, 'Ticker': ticker, 'Start_Value': account.positions[ticker]['start_price'], 'Sale_Value': account.positions[ticker]['value'], 'Account_Value': account.get_value(), 'Total_Invested': account.get_total_invested()}
             account.sell_position(ticker)
+            with open('sales_test.csv', 'a', newline='') as f_object:
+                dictWriter_obj = DictWriter(f_object, fieldnames=field_names)
+                dictWriter_obj.writerow(row)
+                f_object.close()
+
 
 def analyze(data, tickers, end, choice):
     counter = 0
@@ -190,12 +199,10 @@ def test_wrapper(stock_data, tickers, account):
         i += 1
         if i % 10 == 0:
             account.get_account_summary()
-        if i % 30 == 0:
+        if i % 15 == 0:
             account.add_free_cap(100)
             account.save_account()
-            input()
     account.get_account_summary()
-
 
 
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
@@ -216,7 +223,7 @@ else:
     data.to_csv(fileName)
     volume.to_csv(volFileName)
 
-test_account = Account('Ted Tester', 'tedtester@stockio.com', 1000)
+test_account = Account('Ted Tester', 'tedtester@stockio.com', 5000)
 test_wrapper(data, tickers, test_account)
 
 

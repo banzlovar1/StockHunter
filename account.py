@@ -13,6 +13,9 @@ class Account():
     
     def get_postions(self):
         return self.positions
+    
+    def get_total_invested(self):
+        return self.total_invested
 
     def get_value(self):
         return self.value
@@ -49,10 +52,11 @@ class Account():
             self.positions[position.ticker]['value'] = position.value
             self.positions[position.ticker]['start_price'] = position.value
         
-    def sell_position(self, ticker):
+    def sell_position(self, ticker, debug=0):
         if ticker in self.positions:
             self.free_capital += self.positions[ticker]['value']
-            print(f"Selling {ticker} giving {self.positions[ticker]['value']} of free cap")
+            if debug:
+                print(f"Selling {ticker} giving {self.positions[ticker]['value']} of free cap")
             del self.positions[ticker]
         else:
             print(f"User does not own {ticker}")

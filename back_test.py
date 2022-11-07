@@ -1,3 +1,4 @@
+from distutils.command import check
 from gettext import find
 from postion import Position
 from account import Account
@@ -13,6 +14,8 @@ import PySimpleGUI as sg
 import random
 import pandas_ta as pta
 from csv import DictWriter
+import csv
+import argparse
 
 def download(stock, period):
     data = yf.download(stock, period = period)
@@ -115,12 +118,11 @@ def stocks_to_buy(account, picks):
             new_pos = Position(s[0], s[1], (account.free_capital * .1))
             account.buy_position(new_pos)
 
-def stocks_to_sell(account, data):
+def stocks_to_sell(account, stock_data):
     if account.positions:
-        date = data["Date"].tolist()[0]
         sell = []
         for pos in account.positions:
-            rollingData = data[pos]
+            rollingData = stock_data[pos]
             if rollingData.empty:
                 pass
             #print(rollingData.head())
@@ -147,18 +149,19 @@ def stocks_to_sell(account, data):
                 sell.append(pos)
             elif MASlope20 < 0.25:
                 sell.append(pos)
+        return sell
         
-        field_names = ['Date','Ticker', 'Start_Value', 'Sale_Value', 'Account_Value', 'Total_Invested']
-        for ticker in sell:
-            row = {'Date':date, 'Ticker': ticker, 'Start_Value': account.positions[ticker]['start_price'], 'Sale_Value': account.positions[ticker]['value'], 'Account_Value': account.get_value(), 'Total_Invested': account.get_total_invested()}
-            account.sell_position(ticker)
-            with open('sales_test.csv', 'a', newline='') as f_object:
-                dictWriter_obj = DictWriter(f_object, fieldnames=field_names)
-                dictWriter_obj.writerow(row)
-                f_object.close()
+        # field_names = ['Ticker', 'Start_Value', 'Sale_Value', 'Account_Value', 'Total_Invested']
+        # for ticker in sell:
+        #     row = {'Ticker': ticker, 'Start_Value': account.positions[ticker]['start_price'], 'Sale_Value': account.positions[ticker]['value'], 'Account_Value': account.get_value(), 'Total_Invested': account.get_total_invested()}
+        #     account.sell_position(ticker)
+        #     with open('sales_test.csv', 'a', newline='') as f_object:
+        #         dictWriter_obj = DictWriter(f_object, fieldnames=field_names)
+        #         dictWriter_obj.writerow(row)
+        #         f_object.close()
 
 
-def analyze(data, tickers, end, choice):
+def analyze(data, tickers, end):
     counter = 0
     watchList = []
     for i in range(0, end):
@@ -184,7 +187,7 @@ def check_postions(stock_data, account):
         for pos in account.positions:
             cur_price = stock_data.loc[:,pos].tolist()[-1]
             account.update_postion(pos, cur_price)
-        stocks_to_sell(account, stock_data)
+        return stocks_to_sell(account, stock_data)
 
 def test_wrapper(stock_data, tickers, account):
     print(f'Begin Test!!!\n\t{account.name} current value : {account.value}')
@@ -194,7 +197,7 @@ def test_wrapper(stock_data, tickers, account):
     while i < rows - 60:
         picks = []
         check_postions(data.iloc[i:61+i,:], account)
-        picks = analyze(data.iloc[i:61+i,:], tickers, len(tickers), 3)
+        picks = analyze(data.iloc[i:61+i,:], tickers, len(tickers))
         stocks_to_buy(account, picks)
         i += 1
         if i % 10 == 0:
@@ -204,29 +207,71 @@ def test_wrapper(stock_data, tickers, account):
             account.save_account()
     account.get_account_summary()
 
-
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
-
-df = pd.read_csv('sp500.csv')
-tickers = df['Symbol'].tolist()
-fileName = date.today().isoformat() + 'stock_price.csv'
-volFileName = date.today().isoformat() + 'Volume'+'.csv'
-fileName = "2022-10-03stock_price.csv"
-volFileName = "2022-10-03Volume.csv"
-if path.exists(fileName) and path.exists(volFileName):
-    data = pd.read_csv(fileName)
-    volume = pd.read_csv(volFileName)
-else:
-    data = download(tickers, '5y')
-    volume = data['Volume']
-    data = data['Close']
-    data.to_csv(fileName)
-    volume.to_csv(volFileName)
-
-test_account = Account('Ted Tester', 'tedtester@stockio.com', 5000)
-test_wrapper(data, tickers, test_account)
+def load_account(name):
+    with open(name+'_account_summary.txt') as file: 
+        line = file.readline()
+    file.close()
+    account_info = line.split(',')
+    user_account = Account(account_info[0],account_info[1],float(account_info[2]),float(account_info[3]),float(account_info[4]),float(account_info[5]))
+    pos = []
+    if os.stat(name+'_account_position.csv').st_size != 0:
+        with open(name+'_account_position.csv', 'r') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                pos.append(row)
+        for p in pos:
+            user_account.load_positions(p)
+    print(f"{name} Account has been successfully loaded\n")
+    # user_account.get_account_summary()
+    return user_account
 
 
+# os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
+# df = pd.read_csv('sp500.csv')
+# tickers = df['Symbol'].tolist()
+# fileName = date.today().isoformat() + 'stock_price.csv'
+# volFileName = date.today().isoformat() + 'Volume'+'.csv'
+# # fileName = "2022-10-03stock_price.csv"
+# # volFileName = "2022-10-03Volume.csv"
+# if path.exists(fileName) and path.exists(volFileName):
+#     data = pd.read_csv(fileName)
+#     volume = pd.read_csv(volFileName)
+# else:
+#     data = download(tickers, '3y')
+#     volume = data['Volume']
+#     data = data['Open']
+#     data.to_csv(fileName)
+#     volume.to_csv(volFileName)
+
+# df = data.iloc[-60:,:]
+# user = load_account('banzlovar')
+# buy = analyze(df,tickers, len(tickers))
+# print('Stocks to buy')
+# for stock in buy:
+#     print(stock[0])
+# sell = check_postions(df, user)
+# user.get_account_summary()
+# print('Stocks to Sell')
+# for s in sell:
+#     if s not in map(lambda x: x[0], buy):
+#         print(s)
+# user.save_account()
+
+parser = argparse.ArgumentParser(description='Stock picker and account manager')
+
+subparser = parser.add_subparsers()
+parser_buy = subparser.add_parser('buy', help="ticker and amount to buy in USD")
+parser_buy.add_argument('-u', '--user', help='Username', required=True)
+parser_buy.add_argument('-t', '--ticker', help='Stock ticker', required=True)
+parser_buy.add_argument('-amt', '--amount', help='amount of stock to buy in USD', required=True)
+
+parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
+parser_sell.add_argument('-u', '--user', help='Username', required=True)
+parser_sell.add_argument('-t', '--ticker', help='Stocker ticker to sell', required=True)
+
+args = parser.parse_args()
+print(args)
 
 
 

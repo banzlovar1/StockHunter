@@ -2,14 +2,14 @@ import csv
 
 
 class Account():
-    def __init__(self, name, email, capital):
+    def __init__(self, name, email, value, total_invested, free_capital, change):
         self.name = name
         self.email = email
-        self.free_capital = capital
-        self.value = capital
+        self.free_capital = free_capital
+        self.value = value
         self.positions = {}
-        self.total_invested = capital
-        self.change = 0
+        self.total_invested = total_invested
+        self.change = change
     
     def get_postions(self):
         return self.positions
@@ -30,7 +30,7 @@ class Account():
     def get_account_summary(self):
         print(f"name={self.name:<20} email={self.email:<20}         free_capital={str(self.free_capital)}      account_value={str(self.value)}     total_invested={str(self.total_invested)}      account_change={str(self.change)}")
         if self.positions:
-            print("Ticker                Current Price       Shares          Value      %")
+            print("Ticker               Current Price        Shares               Value                %")
             for pos in self.positions:
                 if self.positions[pos]['start_price'] > self.positions[pos]['value']:
                     change = '-' + str((self.positions[pos]['start_price'] - self.positions[pos]['value']) / self.positions[pos]['start_price'])
@@ -79,16 +79,23 @@ class Account():
 
     def save_account(self):
         file_name = self.email.split('@')[0] + '_account_position.csv'
-        with open(file_name, 'w') as file:
+        with open(file_name, 'w', newline='') as file:
             for pos in self.positions:
                 data = [pos ,self.positions[pos]['start_price'],self.positions[pos]['cur_price'],self.positions[pos]['shares'],self.positions[pos]['value']]
                 writer = csv.writer(file)
                 writer.writerow(data)
             file.close()
         file_name = self.email.split('@')[0] + '_account_summary.csv'
-        with open(file_name, 'w') as file:
-            data = [self.name, self.email, self.value, self.total_invested, self.change]
+        with open(file_name, 'w', newline='') as file:
+            data = [self.name, self.email, self.value, self.total_invested, self.free_capital, self.change]
             writer = csv.writer(file)
             writer.writerow(data)
             file.close()
 
+    def load_positions(self, pos):
+        self.positions[pos[0]] = {}
+        self.positions[pos[0]]['start_price'] = float(pos[1])
+        self.positions[pos[0]]['cur_price'] = float(pos[2])
+        self.positions[pos[0]]['shares'] = float(pos[3])
+        self.positions[pos[0]]['value'] = float(pos[4])
+       

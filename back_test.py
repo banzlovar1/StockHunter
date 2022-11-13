@@ -1,19 +1,13 @@
-from distutils.command import check
-from gettext import find
 from postion import Position
 from account import Account
 import yfinance as yf
 import pandas as pd
 from os import path
-from datetime import date, timedelta
+from datetime import date
 import os
-from progressbar import ProgressBar
 import numpy as np
 from scipy.stats import linregress
-import PySimpleGUI as sg
-import random
 import pandas_ta as pta
-from csv import DictWriter
 import csv
 import argparse
 
@@ -80,8 +74,9 @@ def bollinger_bands(data, stockList):
         elif short[-1] > lon[-1] and short[-2] < lon[-2]:
             picks.append((stockList[i],ds[-1],lower_bollinger[-1], rsi))
 
-    # Sort from low to high RSI as lower RSI means oversold  
+    # Sort from low to high RSI
     picks.sort(key = lambda x: x[3])
+    # Return 5% of the stocks picked up to 10
     return picks[:int(.05*len(picks) if len(picks) < 10 else 10)]
 
 def simple_buy(data, stockList):
@@ -139,9 +134,10 @@ def stocks_to_sell(account, stock_data):
             MASlope20 = trenddetector(list(range(0, 3)), lon[-3:])
 
             # Sell triggers
-            # 1) Value of position has dropped to 5% below start
+            # 1) Value of position has dropped to 3% below start
             # 2) 20MA crosses above 5MA
             # 3) 20MA slope drops to lower then .25 (momentum declining)
+            # 4) Price has fell below lower bollinger band (sharp decrease in price)
             if account.positions[pos]['cur_value'] < account.positions[pos]['start_value']:
                 if float((account.positions[pos]['start_value'] - account.positions[pos]['cur_value'])/account.positions[pos]['start_value']) > .03:
                     sell.append(pos)
@@ -149,17 +145,9 @@ def stocks_to_sell(account, stock_data):
                 sell.append(pos)
             elif MASlope20 < 0.25:
                 sell.append(pos)
+            elif ds[-1] < lower_bollinger[-1]:
+                sell.append(pos)
     return sell
-        
-        # field_names = ['Ticker', 'Start_Value', 'Sale_Value', 'Account_Value', 'Total_Invested']
-        # for ticker in sell:
-        #     row = {'Ticker': ticker, 'Start_Value': account.positions[ticker]['start_price'], 'Sale_Value': account.positions[ticker]['value'], 'Account_Value': account.get_value(), 'Total_Invested': account.get_total_invested()}
-        #     account.sell_position(ticker)
-        #     with open('sales_test.csv', 'a', newline='') as f_object:
-        #         dictWriter_obj = DictWriter(f_object, fieldnames=field_names)
-        #         dictWriter_obj.writerow(row)
-        #         f_object.close()
-
 
 def analyze(data, tickers):
     counter = 0
@@ -171,40 +159,17 @@ def analyze(data, tickers):
         if trend.empty:
             pass
         else:
-            trendList = trend.tolist()
+            # trendList = trend.tolist()
             # Only care about close data for now
-            if (trendList[-1] < 600):# and ():
-                watchList.append(tickers[i])
+            # if (trendList[-1] < 600):# and ():
+            watchList.append(tickers[i])
     return bollinger_bands(data, watchList)
 
 def update_postions(account):
-    # define selling positions and updating account and positions here
-    # conditions
-    #   1) Lost 5% on trade
-    #   2) Gained 10% on trade
-    #   3) Stock goes below 20 MA (crossover specific)
     if account.positions:
         for pos in account.positions:
             cur_price = get_current_price(pos)
             account.update_postion(pos, cur_price)
-
-# def test_wrapper(stock_data, tickers, account):
-#     print(f'Begin Test!!!\n\t{account.name} current value : {account.value}')
-#     # Run over 60 data sets for each interval
-#     i = 0
-#     rows = data.shape[0]
-#     while i < rows - 60:
-#         picks = []
-#         check_postions(data.iloc[i:61+i,:], account)
-#         picks = analyze(data.iloc[i:61+i,:], tickers, len(tickers))
-#         stocks_to_buy(account, picks)
-#         i += 1
-#         if i % 10 == 0:
-#             account.get_account_summary()
-#         if i % 15 == 0:
-#             account.add_free_cap(100)
-#             account.save_account()
-#     account.get_account_summary()
 
 def get_current_price(ticker):
     ticker_info = yf.Ticker(ticker)
@@ -236,8 +201,8 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
         # load account
         account_user = load_account(user)
         # update account positions
-        update_postions(account_user)
         if parser_name == 'analyze':
+            update_postions(account_user)
             buy = [i[0] for i in analyze(stock_price_data, tickers)]
             sell = stocks_to_sell(account_user, stock_price_data)
             print("Stocks to sell")
@@ -255,6 +220,7 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
             account_user.get_account_summary()
         elif parser_name == 'sell':
             account_user.sell_position(args.ticker)
+            account_user.get_account_summary()
         elif parser_name == 'summary':
             account_user.get_account_summary()
     else:
@@ -279,19 +245,6 @@ else:
     data.to_csv(fileName)
     volume.to_csv(volFileName)
 
-# df = data.iloc[-60:,:]
-# user = load_account('banzlovar')
-# buy = analyze(df,tickers, len(tickers))
-# print('Stocks to buy')
-# for stock in buy:
-#     print(stock[0])
-# sell = check_postions(df, user)
-# user.get_account_summary()
-# print('Stocks to Sell')
-# for s in sell:
-#     if s not in map(lambda x: x[0], buy):
-#         print(s)
-# user.save_account()
 
 parser = argparse.ArgumentParser(description='Stock picker and account manager')
 
@@ -315,6 +268,10 @@ parser_summary.add_argument('-u', '--user', help='Username', required=True)
 parser_create = subparser.add_parser('create', help='Create account')
 parser_create.add_argument('-u', '--user', help='Username', required=True)
 parser_create.add_argument('-e', '--email', help='Email', required=True)
+parser_create.add_argument('-c', '--capital', help='Capital', required=True)
+
+parser_create = subparser.add_parser('add_capital', help='Add free captial to account')
+parser_create.add_argument('-u', '--user', help='Username', required=True)
 parser_create.add_argument('-c', '--capital', help='Capital', required=True)
 
 args = parser.parse_args()

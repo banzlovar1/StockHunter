@@ -39,24 +39,21 @@ class Account():
                 print(f"{pos:<20} {str(self.positions[pos]['purchase_price']):<20} {str(self.positions[pos]['cur_price']):<20} {str(self.positions[pos]['shares']):<20} {str(self.positions[pos]['cur_value']):<20} {change:<20}")
 
     def buy_position(self, position):
-        if position.value > self.free_capital:
-            self.free_capital -= position.value
-            if position.ticker in self.positions:
-                self.positions[position.ticker]['cur_price'] = position.cur_price
-                self.positions[position.ticker]['shares'] += position.shares
-                self.positions[position.ticker]['cur_value'] += position.value
-                self.positions[position.ticker]['start_value'] += position.value
-                # Average out purchase price for repurchase
-                self.positions[position.ticker]['purchase_price'] = (self.positions[position.ticker]['purchase_price'] + position.cur_price) / 2.0
-            else:
-                self.positions[position.ticker] = {}
-                self.positions[position.ticker]['cur_price'] = position.cur_price
-                self.positions[position.ticker]['shares'] = position.shares
-                self.positions[position.ticker]['cur_value'] = position.value
-                self.positions[position.ticker]['start_value'] = position.value
-                self.positions[position.ticker]['purchase_price'] = position.cur_price
+        self.free_capital -= position.value
+        if position.ticker in self.positions:
+            self.positions[position.ticker]['cur_price'] = position.cur_price
+            self.positions[position.ticker]['shares'] += position.shares
+            self.positions[position.ticker]['cur_value'] += position.value
+            self.positions[position.ticker]['start_value'] += position.value
+            # Average out purchase price for repurchase
+            self.positions[position.ticker]['purchase_price'] = (self.positions[position.ticker]['purchase_price'] + position.cur_price) / 2.0
         else:
-            print("Not enough capital to open position")
+            self.positions[position.ticker] = {}
+            self.positions[position.ticker]['cur_price'] = position.cur_price
+            self.positions[position.ticker]['shares'] = position.shares
+            self.positions[position.ticker]['cur_value'] = position.value
+            self.positions[position.ticker]['start_value'] = position.value
+            self.positions[position.ticker]['purchase_price'] = position.cur_price
         
     def sell_position(self, ticker, debug=0):
         if ticker in self.positions:

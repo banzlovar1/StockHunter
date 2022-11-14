@@ -1,0 +1,6 @@
+.vscode
+*stock_price.csv
+*Volume.csv
+venv
+__pycache__
+*sales_test*

@@ -15,19 +15,14 @@ import PySimpleGUI as sg
 import os.path
 import csv
 import func_timeout as fun
-import pandas_market_calendars as pm
 from scipy.stats import linregress
 import os
 
-os.chdir("B:\\StockHunter\\V1\\")
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 stocks = []
 end_date = date.today().isoformat()
-nyse = pm.get_calendar('NYSE')
 start='2020-8-3'
-r = nyse.valid_days(start_date=start, end_date=end_date)
-r = r[:60]
-end = r[len(r)-1]
 pbar = ProgressBar()
 
 
@@ -94,7 +89,7 @@ def isTrend(data, stockList, choice):
                 short_ma_close = float((short[-1] - lower_bollinger[-1]) / short[-1]) * 100.0
                 gap = float((ds[-1] - lower_bollinger[-1]) / ds[-1]) * 100.0
                 if gap < 1.2 and short_ma_close > 2:
-                    returnList.append(stockList[i])
+                    returnList.append((stockList[i], ds[-1], lower_bollinger[-1], upper_bollinger[-1]))
 
     return returnList
 
@@ -215,121 +210,121 @@ def updatePos(data, ps):
     return ps
 
 
-######### Pre-Processing ##########################
-df = pd.read_csv('B:\StockHunter\V1\sp500.csv')
-tickers = df['Symbol'].tolist()
-fileName = 'B:\StockHunter\V1\\'+ date.today().isoformat() + '.csv'
-volFileName = date.today().isoformat() + 'Volume'+'.csv'
-# fileName = "B:\\StockHunter\\V1\\2020-12-03.csv"
-# volFileName = "B:\\StockHunter\\V1\\2020-12-03Volume.csv"
-if path.exists(fileName) and path.exists(volFileName):
-    data = pd.read_csv(fileName)
-    volume = pd.read_csv(volFileName)
-else:
-    data = download(tickers)
-    volume = data['Volume']
-    data = data['Close']
-    data.to_csv(fileName)
-    volume.to_csv(volFileName)
+# ######### Pre-Processing ##########################
+# df = pd.read_csv('sp500.csv')
+# tickers = df['Symbol'].tolist()
+# fileName = date.today().isoformat() + 'stock_price.csv'
+# volFileName = date.today().isoformat() + 'Volume'+'.csv'
+# # fileName = "B:\\StockHunter\\V1\\2020-12-03.csv"
+# # volFileName = "B:\\StockHunter\\V1\\2020-12-03Volume.csv"
+# if path.exists(fileName) and path.exists(volFileName):
+#     data = pd.read_csv(fileName)
+#     volume = pd.read_csv(volFileName)
+# else:
+#     data = download(tickers)
+#     volume = data['Volume']
+#     data = data['Close']
+#     data.to_csv(fileName)
+#     volume.to_csv(volFileName)
 
-pos = []
-ps = pd.DataFrame()
-try:
-    ps = pd.read_csv('position.csv')
-    ps = updatePos(data, ps)
-    pos = positions(ps)
-except:
-    pass
-######### Pre-Processing ##########################
+# pos = []
+# ps = pd.DataFrame()
+# try:
+#     ps = pd.read_csv('position.csv')
+#     ps = updatePos(data, ps)
+#     pos = positions(ps)
+# except:
+#     pass
+# ######### Pre-Processing ##########################
 
 
-sg.theme('Dark')
-################ Tab 1 Layout #########################
-# First the window layout in 2 columns
+# sg.theme('Dark')
+# ################ Tab 1 Layout #########################
+# # First the window layout in 2 columns
 
-file_list_column = [
-    [sg.Button("Calculate", key ="-CALCULATE-"),
-    sg.Text("")],
+# file_list_column = [
+#     [sg.Button("Calculate", key ="-CALCULATE-"),
+#     sg.Text("")],
 
-    [sg.Checkbox('Crossing Moving Average', default = True, key = "-CMA-"),
-    sg.Checkbox('Breakthrough', key= "-BREAKTHROUGH-")],
+#     [sg.Checkbox('Crossing Moving Average', default = True, key = "-CMA-"),
+#     sg.Checkbox('Breakthrough', key= "-BREAKTHROUGH-")],
 
-    [sg.Listbox(values=[], enable_events=True, size=(40, 20), key="-STOCK LIST-")]
-]
+#     [sg.Listbox(values=[], enable_events=True, size=(40, 20), key="-STOCK LIST-")]
+# ]
 
-# For now will only show the name of the file that was chosen
-image_viewer_column = [
-    [sg.Text("Choose a Stock from the List on the Left:")],
+# # For now will only show the name of the file that was chosen
+# image_viewer_column = [
+#     [sg.Text("Choose a Stock from the List on the Left:")],
 
-    [sg.Image(key="-IMAGE-")],
-]
+#     [sg.Image(key="-IMAGE-")],
+# ]
 
-# ----- Full layout -----
-t1layout = [
-    [sg.Column(file_list_column),
-    sg.VSeperator(),
-    sg.Column(image_viewer_column)]
-]
-########### Tab 1 ###################################
-headings = ps.head()
-########### Tab 2 ###################################
-tab2 = [[sg.Text("Enter Stock, Purchase Price, and Quantity")],
-    [sg.Button("Add", key ="-ADD-"), 
-    sg.Text("Stock"), sg.InputText(key = "-S-", size=(12,1), do_not_clear=False),
-    sg.Text("Price"), sg.InputText(key = "-P-", size=(12,1), do_not_clear=False), 
-    sg.Text("Quantity"), sg.InputText(key = "-Q-", size=(12,1), do_not_clear=False)],
+# # ----- Full layout -----
+# t1layout = [
+#     [sg.Column(file_list_column),
+#     sg.VSeperator(),
+#     sg.Column(image_viewer_column)]
+# ]
+# ########### Tab 1 ###################################
+# headings = ps.head()
+# ########### Tab 2 ###################################
+# tab2 = [[sg.Text("Enter Stock, Purchase Price, and Quantity")],
+#     [sg.Button("Add", key ="-ADD-"), 
+#     sg.Text("Stock"), sg.InputText(key = "-S-", size=(12,1), do_not_clear=False),
+#     sg.Text("Price"), sg.InputText(key = "-P-", size=(12,1), do_not_clear=False), 
+#     sg.Text("Quantity"), sg.InputText(key = "-Q-", size=(12,1), do_not_clear=False)],
 
-    [sg.Text("Stock     Entry      Current      Quantity    Gain")],
+#     [sg.Text("Stock     Entry      Current      Quantity    Gain")],
 
-    [sg.Listbox(values=pos, enable_events=True, size=(80, 20), key="-POSITIONS-")]
-    ]
+#     [sg.Listbox(values=pos, enable_events=True, size=(80, 20), key="-POSITIONS-")]
+#     ]
 
-########### Tab 2 ###################################
+# ########### Tab 2 ###################################
 
-layout = [[sg.TabGroup([[sg.Tab('Stocki', t1layout), sg.Tab('Portfolio', tab2)]])]]
+# layout = [[sg.TabGroup([[sg.Tab('Stocki', t1layout), sg.Tab('Portfolio', tab2)]])]]
 
-window = sg.Window("Stocki", layout)
+# window = sg.Window("Stocki", layout)
 
-######### Window Loop #############################
-while True:
-    event, values = window.read()
-    if event == "Exit" or event == sg.WIN_CLOSED:
-        break
-    # Folder name was filled in, make a list of files in the folder
-    if event == "-CALCULATE-":
-        if values["-BREAKTHROUGH-"] == True and values["-CMA-"] == True:
-            pass
-        elif values["-CMA-"] == True:
-            window["-IMAGE-"].update()
-            stocks = finder(data, 3)
-            window["-STOCK LIST-"].update(stocks)
-            print("CMA")
-        elif values["-BREAKTHROUGH-"] == True:
-            window["-IMAGE-"].update()
-            stocks = finder(data, 2)
-            window["-STOCK LIST-"].update(stocks)
-            print("BT")
-    elif event == "-STOCK LIST-":  # A file was chosen from the listbox
-        try:
-            stock = values["-STOCK LIST-"][0]
-            graph(stock, data[stock], volume[stock])  
-            window["-IMAGE-"].update(filename="stock.png")
-        except:
-            pass
-    elif event == "-ADD-":
-        try:
-            ps = addPosition(data[values["-S-"]], ps, values["-S-"], float(values["-P-"]), int(values["-Q-"]))
-            pos = positions(ps)
-            ps.to_csv('position.csv')
-            window["-POSITIONS-"].update(pos)
-        except:
-            pass
+# ######### Window Loop #############################
+# while True:
+#     event, values = window.read()
+#     if event == "Exit" or event == sg.WIN_CLOSED:
+#         break
+#     # Folder name was filled in, make a list of files in the folder
+#     if event == "-CALCULATE-":
+#         if values["-BREAKTHROUGH-"] == True and values["-CMA-"] == True:
+#             pass
+#         elif values["-CMA-"] == True:
+#             window["-IMAGE-"].update()
+#             stocks = finder(data, 3)
+#             window["-STOCK LIST-"].update(stocks)
+#             print("CMA")
+#         elif values["-BREAKTHROUGH-"] == True:
+#             window["-IMAGE-"].update()
+#             stocks = finder(data, 2)
+#             window["-STOCK LIST-"].update(stocks)
+#             print("BT")
+#     elif event == "-STOCK LIST-":  # A file was chosen from the listbox
+#         try:
+#             stock = values["-STOCK LIST-"][0]
+#             graph(stock, data[stock], volume[stock])  
+#             window["-IMAGE-"].update(filename="stock.png")
+#         except:
+#             pass
+#     elif event == "-ADD-":
+#         try:
+#             ps = addPosition(data[values["-S-"]], ps, values["-S-"], float(values["-P-"]), int(values["-Q-"]))
+#             pos = positions(ps)
+#             ps.to_csv('position.csv')
+#             window["-POSITIONS-"].update(pos)
+#         except:
+#             pass
 
-try:
-    os.remove("stock.png")
-except:
-    pass
-window.close()
+# try:
+#     os.remove("stock.png")
+# except:
+#     pass
+# window.close()
 
-######### Window Loop #############################
+# ######### Window Loop #############################
 

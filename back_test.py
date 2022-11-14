@@ -132,6 +132,7 @@ def stocks_to_sell(account, stock_data):
             upper_bollinger = upper_bollinger.tolist()
             ds = rollingData.tolist()
             MASlope20 = trenddetector(list(range(0, 3)), lon[-3:])
+            price_slope = trenddetector(list(range(0,3)), ds[-3:])
 
             # Sell triggers
             # 1) Value of position has dropped to 3% below start
@@ -140,13 +141,13 @@ def stocks_to_sell(account, stock_data):
             # 4) Price has fell below lower bollinger band (sharp decrease in price)
             if account.positions[pos]['cur_value'] < account.positions[pos]['start_value']:
                 if float((account.positions[pos]['start_value'] - account.positions[pos]['cur_value'])/account.positions[pos]['start_value']) > .03:
-                    sell.append(pos)
-            elif lon[-1] > short[-1]:
-                sell.append(pos)
+                    sell.append((pos, "Greater than 3 percent loss"))
+            elif lon[-1] > short[-1] and price_slope < 0:
+                sell.append((pos, "20MA greater then 5MA and price sloping down"))
             elif MASlope20 < 0.25:
-                sell.append(pos)
+                sell.append((pos, "20MA sloping down"))
             elif ds[-1] < lower_bollinger[-1]:
-                sell.append(pos)
+                sell.append((pos, "Price dropped below lower bolinger"))
     return sell
 
 def analyze(data, tickers):
@@ -219,7 +220,8 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
             account_user.buy_position(Position(args.ticker, get_current_price(args.ticker), args.amount))
             account_user.get_account_summary()
         elif parser_name == 'sell':
-            account_user.sell_position(args.ticker)
+            for tick in args.tickers:
+                account_user.sell_position(tick)
             account_user.get_account_summary()
         elif parser_name == 'summary':
             account_user.get_account_summary()
@@ -260,7 +262,7 @@ parser_buy.add_argument('-a', '--amount', type=float, help='amount of stock to b
 
 parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
 parser_sell.add_argument('-u', '--user', help='Username', required=True)
-parser_sell.add_argument('-t', '--ticker', help='Stocker ticker to sell', required=True)
+parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
 
 parser_summary = subparser.add_parser('summary', help="Account summary")
 parser_summary.add_argument('-u', '--user', help='Username', required=True)

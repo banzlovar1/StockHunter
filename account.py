@@ -1,5 +1,5 @@
 import csv
-
+from datetime import date, datetime
 
 class Account():
     def __init__(self, name, email, account_value, total_invested, free_capital, change=0):
@@ -20,8 +20,8 @@ class Account():
     def get_value(self):
         return self.account_value
     
-    def get_positions(self):
-        return self.positions
+    def get_position(self, ticker, reason, date):
+        return [ticker, self.positions[ticker]['purchase_date'], date, self.positions[ticker]['shares'], self.positions[ticker]['start_value'], self.positions[ticker]['cur_value'], reason]
     
     def add_free_cap(self, amount):
         self.free_capital += amount
@@ -47,6 +47,7 @@ class Account():
             self.positions[position.ticker]['start_value'] += position.value
             # Average out purchase price for repurchase
             self.positions[position.ticker]['purchase_price'] = (self.positions[position.ticker]['purchase_price'] + position.cur_price) / 2.0
+            self.positions[position.ticker]['purchase_date'] = position.purchase_date
         else:
             self.positions[position.ticker] = {}
             self.positions[position.ticker]['cur_price'] = position.cur_price
@@ -54,13 +55,17 @@ class Account():
             self.positions[position.ticker]['cur_value'] = position.value
             self.positions[position.ticker]['start_value'] = position.value
             self.positions[position.ticker]['purchase_price'] = position.cur_price
+            self.positions[position.ticker]['purchase_date'] = position.purchase_date
         
-    def sell_position(self, ticker, debug=0):
+    def sell_position(self, ticker, debug=0, force=0):
         if ticker in self.positions:
-            self.free_capital += self.positions[ticker]['cur_value']
-            if debug:
-                print(f"Selling {ticker} giving {self.positions[ticker]['cur_value']} of free cap")
-            del self.positions[ticker]
+            if self.positions[ticker]['purchase_date'] != date.today().strftime("%Y-%m-%d") or force:
+                self.free_capital += self.positions[ticker]['cur_value']
+                if debug:
+                    print(f"Selling {ticker} giving {self.positions[ticker]['cur_value']} of free cap")
+                del self.positions[ticker]
+            else:
+                print("Day Trade Warning: Cannot sell position")
         else:
             print(f"User does not own {ticker}")
 
@@ -84,7 +89,7 @@ class Account():
         file_name = self.email.split('@')[0] + '_account_position.csv'
         with open(file_name, 'w', newline='') as file:
             for pos in self.positions:
-                data = [pos, self.positions[pos]['purchase_price'],self.positions[pos]['cur_price'],self.positions[pos]['start_value'],self.positions[pos]['shares'],self.positions[pos]['cur_value']]
+                data = [pos, self.positions[pos]['purchase_price'],self.positions[pos]['cur_price'],self.positions[pos]['start_value'],self.positions[pos]['shares'],self.positions[pos]['cur_value'],self.positions[pos]['purchase_date']]
                 writer = csv.writer(file)
                 writer.writerow(data)
             file.close()
@@ -102,4 +107,5 @@ class Account():
         self.positions[pos[0]]['start_value'] = float(pos[3])
         self.positions[pos[0]]['shares'] = float(pos[4])
         self.positions[pos[0]]['cur_value'] = float(pos[5])
+        self.positions[pos[0]]['purchase_date'] = pos[6]
        

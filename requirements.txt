@@ -10,3 +10,5 @@ PySimpleGUI
 func-timeout
 scipy 
 matplotlib
+pandas_ta
+scipy

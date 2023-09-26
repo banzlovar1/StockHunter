@@ -14,6 +14,7 @@ import smtplib, ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import math
+# import robin_stocks.robinhood as rs
 
 def download(stock, period):
     data = yf.download(stock, period = period)
@@ -122,6 +123,21 @@ def simple_buy(data, stockList):
     
     return picks
 
+def stochastic_buy(data, stockList):
+    picks = []
+    for i in range(0, len(stockList)):
+        rollingData = data[stockList[i]]
+        ds = rollingData.tolist()
+        rsi = find_rsi(rollingData).tolist()[-1]
+        if rollingData.empty:
+            pass
+        last_14 = ds[-14:]
+        last_3 = ds[-3:]
+        K = ((ds[-1] - min(last_14))/(max(last_14)-min(last_14))) * 100
+        D = (max(last_3)/min(last_3)) * 100
+        if D < 25:
+            picks.append((stockList[i],ds[-1], rsi))
+
 def stocks_to_buy(account, picks):
     if account.free_capital > 10: 
         buying = picks[:int(.05*len(picks) if len(picks) < 10 else 10) ]
@@ -129,53 +145,79 @@ def stocks_to_buy(account, picks):
             new_pos = Position(s[0], s[1], (account.free_capital * .1))
             account.buy_position(new_pos)
 
-def stocks_to_sell(account, stock_data):
+def stochastic_sell(account, stock_data, stop_loss=.045):
     sell = []
+    today_date = date.today()
     if account.positions:
         for pos in account.positions:
-            rollingData = stock_data[pos]
-            if rollingData.empty:
-                pass
-            #print(rollingData.head())
-            short = rollingData.rolling(5).mean()
-            short = short.tolist()
-            lon = rollingData.rolling(20).mean()
-            std = rollingData.rolling(20).std()
-            upper_bollinger = lon + std * 2
-            lower_bollinger = lon - std * 2
-            lon = lon.tolist()
-            lower_bollinger = lower_bollinger.tolist()
-            upper_bollinger = upper_bollinger.tolist()
-            ds = rollingData.tolist()
-            MASlope20 = trenddetector(list(range(0, 3)), lon[-3:])
-            price_slope = trenddetector(list(range(0,3)), ds[-3:])
+            if account.positions[pos]['purchase_date'] != today_date:
+                rollingData = stock_data[pos]
+                if rollingData.empty:
+                    pass
+                ds = rollingData.tolist()
+                rsi = find_rsi(rollingData).tolist()[-1]
+                if rollingData.empty:
+                    pass
+                last_14 = ds[-14:]
+                last_3 = ds[-3:]
+                K = ((ds[-1] - min(last_14))/(max(last_14)-min(last_14))) * 100
+                D = (max(last_3)/min(last_3)) * 100
+                if D > 80 or K > 80:
+                    sell.append(pos, "Stochastic limit")
+                elif account.positions[pos]['cur_value'] < account.positions[pos]['start_value']:
+                    if float((account.positions[pos]['start_value'] - account.positions[pos]['cur_value'])/account.positions[pos]['start_value']) > stop_loss:
+                        sell.append((pos, "Greater than 3 percent loss"))
+    return sell
 
-            williams_r_high = max(ds[-14:])
-            williams_r_low = min(ds[-14:])
-            if not math.isnan(williams_r_high) or not math.isnan(williams_r_low):
-                try:
-                    williams_r = -100 * ((williams_r_high - ds[-1]) / (williams_r_high - williams_r_low))
-                except ZeroDivisionError:
+def stocks_to_sell(account, stock_data, stop_loss=.045, momentum_drop=.25, williams_r_stop=-40):
+    sell = []
+    today_date = date.today()
+    if account.positions:
+        for pos in account.positions:
+            if account.positions[pos]['purchase_date'] != today_date:
+                rollingData = stock_data[pos]
+                if rollingData.empty:
+                    pass
+                #print(rollingData.head())
+                short = rollingData.rolling(5).mean()
+                short = short.tolist()
+                lon = rollingData.rolling(20).mean()
+                std = rollingData.rolling(20).std()
+                upper_bollinger = lon + std * 2
+                lower_bollinger = lon - std * 2
+                lon = lon.tolist()
+                lower_bollinger = lower_bollinger.tolist()
+                upper_bollinger = upper_bollinger.tolist()
+                ds = rollingData.tolist()
+                MASlope20 = trenddetector(list(range(0, 3)), lon[-3:])
+                price_slope = trenddetector(list(range(0,3)), ds[-3:])
+
+                williams_r_high = max(ds[-14:])
+                williams_r_low = min(ds[-14:])
+                if not math.isnan(williams_r_high) or not math.isnan(williams_r_low):
+                    try:
+                        williams_r = -100 * ((williams_r_high - ds[-1]) / (williams_r_high - williams_r_low))
+                    except ZeroDivisionError:
+                        williams_r = 0
+                else:
                     williams_r = 0
-            else:
-                williams_r = 0
 
-            # Sell triggers
-            # 1) Value of position has dropped to 3% below start
-            # 2) 20MA crosses above 5MA
-            # 3) 20MA slope drops to lower then .25 (momentum declining)
-            # 4) Price has fell below lower bollinger band (sharp decrease in price)
-            if account.positions[pos]['cur_value'] < account.positions[pos]['start_value']:
-                if float((account.positions[pos]['start_value'] - account.positions[pos]['cur_value'])/account.positions[pos]['start_value']) > .03:
-                    sell.append((pos, "Greater than 3 percent loss"))
-            elif lon[-1] > short[-1] and price_slope < 0:
-                sell.append((pos, "20MA greater then 5MA and price sloping down"))
-            elif MASlope20 < 0.25:
-                sell.append((pos, "20MA sloping down"))
-            elif ds[-1] < lower_bollinger[-1]:
-                sell.append((pos, "Price dropped below lower bolinger"))
-            elif williams_r > -40:
-                sell.append((pos, "Williams R Percent indicates over sold"))
+                # Sell triggers
+                # 1) Value of position has dropped to 3% below start
+                # 2) 20MA crosses above 5MA
+                # 3) 20MA slope drops to lower then .25 (momentum declining)
+                # 4) Price has fell below lower bollinger band (sharp decrease in price)
+                if account.positions[pos]['cur_value'] < account.positions[pos]['start_value']:
+                    if float((account.positions[pos]['start_value'] - account.positions[pos]['cur_value'])/account.positions[pos]['start_value']) > stop_loss:
+                        sell.append((pos, "Greater than 3 percent loss"))
+                elif lon[-1] > short[-1] and price_slope < 0:
+                    sell.append((pos, "20MA greater then 5MA and price sloping down"))
+                elif MASlope20 < momentum_drop:
+                    sell.append((pos, "20MA sloping down"))
+                elif ds[-1] < lower_bollinger[-1]:
+                    sell.append((pos, "Price dropped below lower bolinger"))
+                elif williams_r > williams_r_stop:
+                    sell.append((pos, "Williams R Percent indicates over sold"))
     return sell
 
 def analyze(data, tickers):
@@ -192,6 +234,7 @@ def analyze(data, tickers):
             # Only care about close data for now
             # if (trendList[-1] < 600):# and ():
             watchList.append(tickers[i])
+    # return stochastic_buy(data, watchList)
     return bollinger_bands(data, watchList)
 
 def update_postions(account):
@@ -249,13 +292,14 @@ def email(account, sell, buy):
                     </tr>
             """
         for s in sell:
-            html += f"""
-                    <tr>
-                        <td>{s[0]}</td>
-                        <td>{account.poistions[s[0]]['cur_price']}</td>
-                        <td>{str(round(((account.positions[s[0]]['start_value'] - account.positions[s[0]]['cur_value']) / account.positions[s[0]]['start_value']) * -100 if account.positions[s[0]]['start_value'] > account.positions[s[0]]['cur_value'] else ((account.positions[s[0]]['cur_value'] - account.positions[s[0]]['start_value']) / account.positions[s[0]]['start_value']) * 100, 2))}</td>
-                    </tr>
-            """
+            if account.positions[s[0]]['purchase_price'] != date.today().strftime("%Y-%m-%d"):
+                html += f"""
+                        <tr>
+                            <td>{s[0]}</td>
+                            <td>{account.poistions[s[0]]['cur_price']}</td>
+                            <td>{str(round(((account.positions[s[0]]['start_value'] - account.positions[s[0]]['cur_value']) / account.positions[s[0]]['start_value']) * -100 if account.positions[s[0]]['start_value'] > account.positions[s[0]]['cur_value'] else ((account.positions[s[0]]['cur_value'] - account.positions[s[0]]['start_value']) / account.positions[s[0]]['start_value']) * 100, 2))}</td>
+                        </tr>
+                """
         html += "</table>"
     if len(buy):
         html += """
@@ -325,12 +369,13 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
             print(b)
         if parser_name == 'buy':
             #buy stock wrapper
+            today_date = date.today()
             get_current_price(args.ticker)
-            account_user.buy_position(Position(args.ticker, get_current_price(args.ticker), args.amount))
+            account_user.buy_position(Position(args.ticker, get_current_price(args.ticker), args.amount, today_date))
             account_user.get_account_summary()
         elif parser_name == 'sell':
             for tick in args.tickers:
-                account_user.sell_position(tick)
+                account_user.sell_position(tick,force=args.force)
             account_user.get_account_summary()
         elif parser_name == 'summary':
             account_user.get_account_summary()
@@ -348,62 +393,79 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
         account_user = Account(args.user, args.email, args.capital, args.capital,args.capital)
     account_user.save_account()
     
+# To Do:
+# 1) Intregrate robinhood login
+#   rs.login(username, password)
+# 2) Link account to robinhood login (load account info to build account)
+#   rs.load_account_profile()
+#   rs.build_holdings()
+# 3) Automate analyze task
+# 4) Send buy and sell calls to RH
+#   Send buy in the amount of dollar and not shares rs.orders.order_buy_fractional_by_price(ticker, amnt$)
+#       Save order date in csv file
+#   Send sell orders to close entire position rs.orders.order_sell_market(ticker, quan)
+#       Save sale date and metrics in csv file
+# 5) Ensure no day trading is going on
 
-if __name__ == "main":
-    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+# rs.login(os.environ.get('robinhood_username'), os.environ.get('robinhood_password'))
+# print(rs.build_holdings())
 
-    df = pd.read_csv('sp500.csv')
-    tickers = df['Symbol'].tolist()
-    fileName = date.today().isoformat() + 'stock_price.csv'
-    volFileName = date.today().isoformat() + 'Volume'+'.csv'
-    # fileName = "2022-10-03stock_price.csv"
-    # volFileName = "2022-10-03Volume.csv"
-    if path.exists(fileName) and path.exists(volFileName):
-        data = pd.read_csv(fileName)
-        volume = pd.read_csv(volFileName)
-    else:
-        data = download(tickers, '3y')
-        volume = data['Volume']
-        data = data['Open']
-        data.to_csv(fileName)
-        volume.to_csv(volFileName)
+# # if __name__ == "main":
+# os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
+# df = pd.read_csv('sp500.csv')
+# tickers = df['Symbol'].tolist()
+# fileName = date.today().isoformat() + 'stock_price.csv'
+# volFileName = date.today().isoformat() + 'Volume'+'.csv'
+# # fileName = "2022-10-03stock_price.csv"
+# # volFileName = "2022-10-03Volume.csv"
+# if path.exists(fileName) and path.exists(volFileName):
+#     data = pd.read_csv(fileName)
+#     volume = pd.read_csv(volFileName)
+# else:
+#     data = download(tickers, '1y')
+#     volume = data['Volume']
+#     data = data['Open']
+#     data.to_csv(fileName)
+#     volume.to_csv(volFileName)
 
 
-    parser = argparse.ArgumentParser(description='Stock picker and account manager')
+# parser = argparse.ArgumentParser(description='Stock picker and account manager')
 
-    subparser = parser.add_subparsers(dest='command') 
+# subparser = parser.add_subparsers(dest='command') 
 
-    parser_analyze = subparser.add_parser('analyze', help='Upddate and Analyze account holdings')
-    parser_analyze.add_argument('-u', '--user', help='Username', required=True)
+# parser_analyze = subparser.add_parser('analyze', help='Upddate and Analyze account holdings')
+# parser_analyze.add_argument('-u', '--user', help='Username', required=True)
 
-    parser_buy = subparser.add_parser('buy', help="ticker and amount to buy in USD")
-    parser_buy.add_argument('-u', '--user', help='Username', required=True)
-    parser_buy.add_argument('-t', '--ticker', help='Stock ticker', required=True)
-    parser_buy.add_argument('-a', '--amount', type=float, help='amount of stock to buy in USD', required=True)
+# parser_buy = subparser.add_parser('buy', help="ticker and amount to buy in USD")
+# parser_buy.add_argument('-u', '--user', help='Username', required=True)
+# parser_buy.add_argument('-t', '--ticker', help='Stock ticker', required=True)
+# parser_buy.add_argument('-a', '--amount', type=float, help='amount of stock to buy in USD', required=True)
 
-    parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
-    parser_sell.add_argument('-u', '--user', help='Username', required=True)
-    parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
+# parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
+# parser_sell.add_argument('-u', '--user', help='Username', required=True)
+# parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
+# parser_sell.add_argument('-f', '--force', action='store_true', help='Force stock sale regardless of day trade warning')
 
-    parser_summary = subparser.add_parser('summary', help="Account summary")
-    parser_summary.add_argument('-u', '--user', help='Username', required=True)
+# parser_summary = subparser.add_parser('summary', help="Account summary")
+# parser_summary.add_argument('-u', '--user', help='Username', required=True)
 
-    parser_create = subparser.add_parser('create', help='Create account')
-    parser_create.add_argument('-u', '--user', help='Username', required=True)
-    parser_create.add_argument('-e', '--email', help='Email', required=True)
-    parser_create.add_argument('-c', '--capital', help='Capital', required=True)
+# parser_create = subparser.add_parser('create', help='Create account')
+# parser_create.add_argument('-u', '--user', help='Username', required=True)
+# parser_create.add_argument('-e', '--email', help='Email', required=True)
+# parser_create.add_argument('-c', '--capital', help='Capital', required=True)
 
-    parser_create = subparser.add_parser('add_capital', help='Add free captial to account')
-    parser_create.add_argument('-u', '--user', help='Username', required=True)
-    parser_create.add_argument('-c', '--capital', help='Capital', required=True)
+# parser_create = subparser.add_parser('add_capital', help='Add free captial to account')
+# parser_create.add_argument('-u', '--user', help='Username', required=True)
+# parser_create.add_argument('-c', '--capital', help='Capital', required=True)
 
-    parser_create = subparser.add_parser('email', help='Email account details and analyzed stocks')
-    parser_create.add_argument('-u', '--user', help='Username', required=True)
+# parser_create = subparser.add_parser('email', help='Email account details and analyzed stocks')
+# parser_create.add_argument('-u', '--user', help='Username', required=True)
 
-    args = parser.parse_args()
+# args = parser.parse_args()
 
-    arg_parse(args.command, args, data, tickers)
-    # print(args.command)
+# arg_parse(args.command, args, data, tickers)
+# # print(args.command)
 
 
 

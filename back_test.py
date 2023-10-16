@@ -237,10 +237,10 @@ def analyze(data, tickers):
     # return stochastic_buy(data, watchList)
     return bollinger_bands(data, watchList)
 
-def update_postions(account):
+def update_postions(account, data):
     if account.positions:
         for pos in account.positions:
-            cur_price = get_current_price(pos)
+            cur_price = data[pos].tolist()[-1]
             account.update_postion(pos, cur_price)
 
 def email(account, sell, buy):
@@ -356,7 +356,7 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
         account_user = load_account(user)
         # update account positions
         if parser_name == 'analyze':
-            update_postions(account_user)
+            update_postions(account_user, data)
             buy = [i[0] for i in analyze(stock_price_data, tickers)]
             sell = stocks_to_sell(account_user, stock_price_data)
             print("Stocks to sell")
@@ -378,6 +378,7 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
                 account_user.sell_position(tick,force=args.force)
             account_user.get_account_summary()
         elif parser_name == 'summary':
+            update_postions(account_user, data)
             account_user.get_account_summary()
         elif parser_name == 'email':
             # update_postions(account_user)
@@ -419,15 +420,15 @@ fileName = date.today().isoformat() + 'stock_price.csv'
 volFileName = date.today().isoformat() + 'Volume'+'.csv'
 # fileName = "2022-10-03stock_price.csv"
 # volFileName = "2022-10-03Volume.csv"
-if path.exists(fileName) and path.exists(volFileName):
-    data = pd.read_csv(fileName)
-    volume = pd.read_csv(volFileName)
-else:
-    data = download(tickers, '90d')
-    volume = data['Volume']
-    data = data['Adj Close']
-    data.to_csv(fileName)
-    volume.to_csv(volFileName)
+# if path.exists(fileName) and path.exists(volFileName):
+#     data = pd.read_csv(fileName)
+#     volume = pd.read_csv(volFileName)
+# else:
+data = download(tickers, '90d')
+volume = data['Volume']
+data = data['Adj Close']
+data.to_csv(fileName)
+volume.to_csv(volFileName)
 
 
 parser = argparse.ArgumentParser(description='Stock picker and account manager')

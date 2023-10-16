@@ -370,8 +370,8 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
         if parser_name == 'buy':
             #buy stock wrapper
             today_date = date.today()
-            get_current_price(args.ticker)
-            account_user.buy_position(Position(args.ticker, get_current_price(args.ticker), args.amount, today_date))
+            # get_current_price(args.ticker)
+            account_user.buy_position(Position(args.ticker, args.purchase_price, args.amount, today_date))
             account_user.get_account_summary()
         elif parser_name == 'sell':
             for tick in args.tickers:
@@ -410,64 +410,72 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
 # rs.login(os.environ.get('robinhood_username'), os.environ.get('robinhood_password'))
 # print(rs.build_holdings())
 
-# # if __name__ == "main":
-# os.chdir(os.path.dirname(os.path.realpath(__file__)))
+# if __name__ == "main":
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-# df = pd.read_csv('sp500.csv')
-# tickers = df['Symbol'].tolist()
-# fileName = date.today().isoformat() + 'stock_price.csv'
-# volFileName = date.today().isoformat() + 'Volume'+'.csv'
-# # fileName = "2022-10-03stock_price.csv"
-# # volFileName = "2022-10-03Volume.csv"
-# if path.exists(fileName) and path.exists(volFileName):
-#     data = pd.read_csv(fileName)
-#     volume = pd.read_csv(volFileName)
-# else:
-#     data = download(tickers, '1y')
-#     volume = data['Volume']
-#     data = data['Open']
-#     data.to_csv(fileName)
-#     volume.to_csv(volFileName)
-
-
-# parser = argparse.ArgumentParser(description='Stock picker and account manager')
-
-# subparser = parser.add_subparsers(dest='command') 
-
-# parser_analyze = subparser.add_parser('analyze', help='Upddate and Analyze account holdings')
-# parser_analyze.add_argument('-u', '--user', help='Username', required=True)
-
-# parser_buy = subparser.add_parser('buy', help="ticker and amount to buy in USD")
-# parser_buy.add_argument('-u', '--user', help='Username', required=True)
-# parser_buy.add_argument('-t', '--ticker', help='Stock ticker', required=True)
-# parser_buy.add_argument('-a', '--amount', type=float, help='amount of stock to buy in USD', required=True)
-
-# parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
-# parser_sell.add_argument('-u', '--user', help='Username', required=True)
-# parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
-# parser_sell.add_argument('-f', '--force', action='store_true', help='Force stock sale regardless of day trade warning')
-
-# parser_summary = subparser.add_parser('summary', help="Account summary")
-# parser_summary.add_argument('-u', '--user', help='Username', required=True)
-
-# parser_create = subparser.add_parser('create', help='Create account')
-# parser_create.add_argument('-u', '--user', help='Username', required=True)
-# parser_create.add_argument('-e', '--email', help='Email', required=True)
-# parser_create.add_argument('-c', '--capital', help='Capital', required=True)
-
-# parser_create = subparser.add_parser('add_capital', help='Add free captial to account')
-# parser_create.add_argument('-u', '--user', help='Username', required=True)
-# parser_create.add_argument('-c', '--capital', help='Capital', required=True)
-
-# parser_create = subparser.add_parser('email', help='Email account details and analyzed stocks')
-# parser_create.add_argument('-u', '--user', help='Username', required=True)
-
-# args = parser.parse_args()
-
-# arg_parse(args.command, args, data, tickers)
-# # print(args.command)
+df = pd.read_csv('sp500.csv')
+tickers = df['Symbol'].tolist()
+fileName = date.today().isoformat() + 'stock_price.csv'
+volFileName = date.today().isoformat() + 'Volume'+'.csv'
+# fileName = "2022-10-03stock_price.csv"
+# volFileName = "2022-10-03Volume.csv"
+if path.exists(fileName) and path.exists(volFileName):
+    data = pd.read_csv(fileName)
+    volume = pd.read_csv(volFileName)
+else:
+    data = download(tickers, '90d')
+    volume = data['Volume']
+    data = data['Adj Close']
+    data.to_csv(fileName)
+    volume.to_csv(volFileName)
 
 
+parser = argparse.ArgumentParser(description='Stock picker and account manager')
+
+subparser = parser.add_subparsers(dest='command') 
+
+parser_analyze = subparser.add_parser('analyze', help='Upddate and Analyze account holdings')
+parser_analyze.add_argument('-u', '--user', help='Username', required=True)
+
+parser_buy = subparser.add_parser('buy', help="ticker and amount to buy in USD")
+parser_buy.add_argument('-u', '--user', help='Username', required=True)
+parser_buy.add_argument('-t', '--ticker', help='Stock ticker', required=True)
+parser_buy.add_argument('-a', '--amount', type=float, help='amount of stock to buy in USD', required=True)
+parser_buy.add_argument('-pp', '--purchase_price', type=float, help='stocks purchase price', required=True)
+
+
+parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
+parser_sell.add_argument('-u', '--user', help='Username', required=True)
+parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
+parser_sell.add_argument('-f', '--force', action='store_true', help='Force stock sale regardless of day trade warning')
+
+parser_summary = subparser.add_parser('summary', help="Account summary")
+parser_summary.add_argument('-u', '--user', help='Username', required=True)
+
+parser_create = subparser.add_parser('create', help='Create account')
+parser_create.add_argument('-u', '--user', help='Username', required=True)
+parser_create.add_argument('-e', '--email', help='Email', required=True)
+parser_create.add_argument('-c', '--capital', help='Capital', required=True)
+
+parser_create = subparser.add_parser('add_capital', help='Add free captial to account')
+parser_create.add_argument('-u', '--user', help='Username', required=True)
+parser_create.add_argument('-c', '--capital', help='Capital', required=True)
+
+parser_create = subparser.add_parser('email', help='Email account details and analyzed stocks')
+parser_create.add_argument('-u', '--user', help='Username', required=True)
+
+args = parser.parse_args()
+
+arg_parse(args.command, args, data, tickers)
+# print(args.command)
+
+# Next steps
+# Create jenkins server on old laptop and treat as host
+# Push my account info into branch and treat as "Trading Branch"
+# Jenkins job to run every few hours between trading hours
+# Clone the repo into server
+# Analyze account, get stocks to buy, give stocks to sell, send in an email
+# On my computer or any computer checkout branch, update positions and push to server for Jenkins job to pull and analzye
 
 
 

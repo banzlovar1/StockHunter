@@ -412,25 +412,6 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
 # print(rs.build_holdings())
 
 # if __name__ == "main":
-os.chdir(os.path.dirname(os.path.realpath(__file__)))
-
-df = pd.read_csv('sp500.csv')
-tickers = df['Symbol'].tolist()
-fileName = date.today().isoformat() + 'stock_price.csv'
-volFileName = date.today().isoformat() + 'Volume'+'.csv'
-# fileName = "2022-10-03stock_price.csv"
-# volFileName = "2022-10-03Volume.csv"
-# if path.exists(fileName) and path.exists(volFileName):
-#     data = pd.read_csv(fileName)
-#     volume = pd.read_csv(volFileName)
-# else:
-data = download(tickers, '90d')
-volume = data['Volume']
-data = data['Adj Close']
-data.to_csv(fileName)
-volume.to_csv(volFileName)
-
-
 parser = argparse.ArgumentParser(description='Stock picker and account manager')
 
 subparser = parser.add_subparsers(dest='command') 
@@ -466,6 +447,24 @@ parser_create = subparser.add_parser('email', help='Email account details and an
 parser_create.add_argument('-u', '--user', help='Username', required=True)
 
 args = parser.parse_args()
+
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
+df = pd.read_csv('sp500.csv')
+tickers = df['Symbol'].tolist()
+fileName = date.today().isoformat() + 'stock_price.csv'
+volFileName = date.today().isoformat() + 'Volume'+'.csv'
+# fileName = "2022-10-03stock_price.csv"
+# volFileName = "2022-10-03Volume.csv"
+# if path.exists(fileName) and path.exists(volFileName):
+#     data = pd.read_csv(fileName)
+#     volume = pd.read_csv(volFileName)
+# else:
+data = download(tickers, '90d')
+volume = data['Volume']
+data = data['Adj Close']
+data.to_csv(fileName)
+volume.to_csv(volFileName)
 
 arg_parse(args.command, args, data, tickers)
 # print(args.command)

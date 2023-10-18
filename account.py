@@ -33,9 +33,9 @@ class Account():
             print("Ticker               Purchase Price       Current Price        Shares               Current Value        %")
             for pos in self.positions:
                 if self.positions[pos]['start_value'] > self.positions[pos]['cur_value']:
-                    change = '-' + str(round(((self.positions[pos]['start_value'] - self.positions[pos]['cur_value']) / self.positions[pos]['start_value']) * 100, 2))
+                    change = '-' + str(round(((self.positions[pos]['start_value'] - self.positions[pos]['cur_value']) / self.positions[pos]['start_value']) * 100, 5))
                 else:
-                    change = str(round(((self.positions[pos]['cur_value'] - self.positions[pos]['start_value']) / self.positions[pos]['start_value']) * 100, 2))
+                    change = str(round(((self.positions[pos]['cur_value'] - self.positions[pos]['start_value']) / self.positions[pos]['start_value']) * 100, 5))
                 print(f"{pos:<20} {str(self.positions[pos]['purchase_price']):<20} {str(self.positions[pos]['cur_price']):<20} {str(self.positions[pos]['shares']):<20} {str(self.positions[pos]['cur_value']):<20} {change:<20}")
 
     def buy_position(self, position):
@@ -62,19 +62,18 @@ class Account():
             if self.positions[ticker]['purchase_date'] != date.today().strftime("%Y-%m-%d") or force:
                 file_name = self.email.split('@')[0] + '_account_sale_data.csv'
                 with open(file_name, 'w', newline='') as file:
-                    if self.positions[ticker]['start_value'] > self.positions[ticker]['cur_value']:
-                        change = '-' + str(round(((self.positions[ticker]['start_value'] - self.positions[ticker]['cur_value']) / self.positions[ticker]['start_value']) * 100, 2))
+                    if self.positions[ticker]['purchase_price'] > sale_price:
+                        change = '-' + str(round(((self.positions[ticker]['purchase_price'] - sale_price) / self.positions[ticker]['purchase_price']) * 100, 5))
                     else:
-                        change = str(round(((self.positions[ticker]['cur_value'] - self.positions[ticker]['start_value']) / self.positions[ticker]['start_value']) * 100, 2))
+                        change = str(round(((sale_price - self.positions[ticker]['purchase_price']) / self.positions[ticker]['purchase_price']) * 100, 5))
 
                     data = [ticker, self.positions[ticker]['purchase_date'], self.positions[ticker]['purchase_price'], sale_price, self.positions[ticker]['shares'], change]
                     writer = csv.writer(file)
                     writer.writerow(data)
-                    file.close()
                     
                     if debug:
                         print(f"Selling {ticker} giving {self.positions[ticker]['cur_value']} of free cap")
-                self.free_capital += self.positions[ticker]['shares'] * sale_price
+                self.free_capital += self.positions[ticker]['shares'] * float(sale_price)
                 del self.positions[ticker]
             else:
                 print("Day Trade Warning: Cannot sell position")

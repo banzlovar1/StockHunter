@@ -7,3 +7,4 @@ __pycache__
 sell_pos.csv
 test_account_position.csv
 test_account_summary.csv
+test_account_sale_data.csv

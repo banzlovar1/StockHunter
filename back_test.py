@@ -432,7 +432,7 @@ parser_buy.add_argument('-pp', '--purchase_price', type=float, help='stocks purc
 parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
 parser_sell.add_argument('-u', '--user', help='Username', required=True)
 parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
-parser_sell.add_argument('-sp', '--sale_price', nargs='+', help='Stocks value at sale', required=True)
+parser_sell.add_argument('-sp', '--sale_price', type=float, help='Stocks value at sale', required=True)
 parser_sell.add_argument('-f', '--force', action='store_true', help='Force stock sale regardless of day trade warning')
 
 parser_summary = subparser.add_parser('summary', help="Account summary")

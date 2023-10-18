@@ -5,3 +5,5 @@ venv
 __pycache__
 *sales_test*
 sell_pos.csv
+test_account_position.csv
+test_account_summary.csv

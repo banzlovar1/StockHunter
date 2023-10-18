@@ -57,10 +57,10 @@ class Account():
             self.positions[position.ticker]['purchase_price'] = position.cur_price
             self.positions[position.ticker]['purchase_date'] = position.purchase_date
         
-    def sell_position(self, ticker, debug=0, force=0):
+    def sell_position(self, ticker, sale_price, debug=0, force=0):
         if ticker in self.positions:
             if self.positions[ticker]['purchase_date'] != date.today().strftime("%Y-%m-%d") or force:
-                self.free_capital += self.positions[ticker]['cur_value']
+                self.free_capital += self.positions[ticker]['shares'] * sale_price
                 if debug:
                     print(f"Selling {ticker} giving {self.positions[ticker]['cur_value']} of free cap")
                 del self.positions[ticker]

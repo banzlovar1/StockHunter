@@ -174,6 +174,9 @@ def stocks_to_sell(account, stock_data, stop_loss=.045, momentum_drop=.25, willi
     today_date = date.today()
     if account.positions:
         for pos in account.positions:
+            print(pos)
+            print(account.positions[pos]['purchase_date'])
+            print(today_date)
             if account.positions[pos]['purchase_date'] != today_date:
                 rollingData = stock_data[pos]
                 if rollingData.empty:
@@ -203,7 +206,7 @@ def stocks_to_sell(account, stock_data, stop_loss=.045, momentum_drop=.25, willi
                     williams_r = 0
 
                 # Sell triggers
-                # 1) Value of position has dropped to 3% below start
+                # 1) Value of position has dropped to 4.5% below start
                 # 2) 20MA crosses above 5MA
                 # 3) 20MA slope drops to lower then .25 (momentum declining)
                 # 4) Price has fell below lower bollinger band (sharp decrease in price)
@@ -375,7 +378,7 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
             account_user.get_account_summary()
         elif parser_name == 'sell':
             for tick in args.tickers:
-                account_user.sell_position(tick,force=args.force)
+                account_user.sell_position(tick, args.sale_price,force=args.force)
             account_user.get_account_summary()
         elif parser_name == 'summary':
             update_postions(account_user, data)
@@ -429,6 +432,7 @@ parser_buy.add_argument('-pp', '--purchase_price', type=float, help='stocks purc
 parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
 parser_sell.add_argument('-u', '--user', help='Username', required=True)
 parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
+parser_sell.add_argument('-sp', '--sale_price', nargs='+', help='Stocks value at sale', required=True)
 parser_sell.add_argument('-f', '--force', action='store_true', help='Force stock sale regardless of day trade warning')
 
 parser_summary = subparser.add_parser('summary', help="Account summary")

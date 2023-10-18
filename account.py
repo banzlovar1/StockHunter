@@ -60,9 +60,21 @@ class Account():
     def sell_position(self, ticker, sale_price, debug=0, force=0):
         if ticker in self.positions:
             if self.positions[ticker]['purchase_date'] != date.today().strftime("%Y-%m-%d") or force:
+                file_name = self.email.split('@')[0] + '_account_sale_data.csv'
+                with open(file_name, 'w', newline='') as file:
+                    if self.positions[ticker]['start_value'] > self.positions[ticker]['cur_value']:
+                        change = '-' + str(round(((self.positions[ticker]['start_value'] - self.positions[ticker]['cur_value']) / self.positions[ticker]['start_value']) * 100, 2))
+                    else:
+                        change = str(round(((self.positions[ticker]['cur_value'] - self.positions[ticker]['start_value']) / self.positions[ticker]['start_value']) * 100, 2))
+
+                    data = [ticker, self.positions[ticker]['purchase_date'], self.positions[ticker]['purchase_price'], sale_price, self.positions[ticker]['shares'], change]
+                    writer = csv.writer(file)
+                    writer.writerow(data)
+                    file.close()
+                    
+                    if debug:
+                        print(f"Selling {ticker} giving {self.positions[ticker]['cur_value']} of free cap")
                 self.free_capital += self.positions[ticker]['shares'] * sale_price
-                if debug:
-                    print(f"Selling {ticker} giving {self.positions[ticker]['cur_value']} of free cap")
                 del self.positions[ticker]
             else:
                 print("Day Trade Warning: Cannot sell position")

@@ -17,7 +17,7 @@ import math
 # import robin_stocks.robinhood as rs
 
 def download(stock, period):
-    data = yf.download(stock, period = period)
+    data = yf.download(stock, period = period, progress=False)
     return data
 
 def trenddetector(index, data, order = 1):
@@ -174,9 +174,6 @@ def stocks_to_sell(account, stock_data, stop_loss=.045, momentum_drop=.25, willi
     today_date = date.today()
     if account.positions:
         for pos in account.positions:
-            print(pos)
-            print(account.positions[pos]['purchase_date'])
-            print(today_date)
             if account.positions[pos]['purchase_date'] != today_date:
                 rollingData = stock_data[pos]
                 if rollingData.empty:
@@ -373,12 +370,13 @@ def arg_parse(parser_name, args, stock_price_data, tickers):
         if parser_name == 'buy':
             #buy stock wrapper
             today_date = date.today()
-            # get_current_price(args.ticker)
-            account_user.buy_position(Position(args.ticker, args.purchase_price, args.amount, today_date))
+            for pos in args.positions:
+                account_user.buy_position(Position(pos, float(input(f'Purchase Price {pos}: ')), float(input(f'Purchase Amount {pos}: ')), today_date))
+                print('\n')
             account_user.get_account_summary()
         elif parser_name == 'sell':
-            for tick in args.tickers:
-                account_user.sell_position(tick, args.sale_price,force=args.force)
+            for pos in args.positions:
+                account_user.sell_position(pos, float(input(f'Sale Price for {pos}: ')),force=args.force)
             account_user.get_account_summary()
         elif parser_name == 'summary':
             update_postions(account_user, data)
@@ -424,15 +422,17 @@ parser_analyze.add_argument('-u', '--user', help='Username', required=True)
 
 parser_buy = subparser.add_parser('buy', help="ticker and amount to buy in USD")
 parser_buy.add_argument('-u', '--user', help='Username', required=True)
-parser_buy.add_argument('-t', '--ticker', help='Stock ticker', required=True)
-parser_buy.add_argument('-a', '--amount', type=float, help='amount of stock to buy in USD', required=True)
-parser_buy.add_argument('-pp', '--purchase_price', type=float, help='stocks purchase price', required=True)
+parser_buy.add_argument('-p', '--positions', nargs='+', help='Postions to sell in tuple list [(ticker,sale_price)]', required=True)
+# parser_buy.add_argument('-t', '--ticker', help='Stock ticker', required=True)
+# parser_buy.add_argument('-a', '--amount', type=float, help='amount of stock to buy in USD', required=True)
+# parser_buy.add_argument('-pp', '--purchase_price', type=float, help='stocks purchase price', required=True)
 
 
 parser_sell = subparser.add_parser('sell', help='Stock to sell (full close of position)')
 parser_sell.add_argument('-u', '--user', help='Username', required=True)
-parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
-parser_sell.add_argument('-sp', '--sale_price', type=float, help='Stocks value at sale', required=True)
+parser_sell.add_argument('-p', '--positions', nargs='+', help='Postions to sell in tuple list [(ticker,sale_price)]', required=True)
+# parser_sell.add_argument('-t', '--tickers', nargs='+', help='Stocker ticker to sell', required=True)
+# parser_sell.add_argument('-sp', '--sale_price', type=float, help='Stocks value at sale', required=True)
 parser_sell.add_argument('-f', '--force', action='store_true', help='Force stock sale regardless of day trade warning')
 
 parser_summary = subparser.add_parser('summary', help="Account summary")
